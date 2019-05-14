@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
+#include "opt_sanitizer.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -44,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/filedesc.h>
 #include <sys/imgact.h>
 #include <sys/imgact_elf.h>
+#include <sys/kasan.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -1327,6 +1329,9 @@ exec_alloc_args_kva(void **cookie)
 		mtx_unlock(&exec_args_kva_mtx);
 	}
 	*(struct exec_args_kva **)cookie = argkva;
+#ifdef KASAN
+	kasan_unpoison(argkva->addr, exec_map_entry_size);
+#endif
 	return (argkva->addr);
 }
 
@@ -1335,6 +1340,9 @@ exec_release_args_kva(struct exec_args_kva *argkva, u_int gen)
 {
 	vm_offset_t base;
 
+#ifdef KASAN
+	kasan_poison(argkva->addr, exec_map_entry_size);
+#endif
 	base = argkva->addr;
 	if (argkva->gen != gen) {
 		(void)vm_map_madvise(exec_map, base, base + exec_map_entry_size,
