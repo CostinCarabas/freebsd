@@ -28,6 +28,7 @@
 #include "opt_acpi.h"
 #include "opt_platform.h"
 #include "opt_ddb.h"
+#include "opt_sanitizer.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -42,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/efi.h>
 #include <sys/exec.h>
 #include <sys/imgact.h>
+#include <sys/kasan.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -1116,6 +1118,10 @@ initarm(struct arm64_bootparams *abp)
 		print_efi_map_entries(efihdr);
 		arm_physmem_print_tables();
 	}
+
+#ifdef KASAN
+	kasan_init();
+#endif
 
 	early_boot = 0;
 }

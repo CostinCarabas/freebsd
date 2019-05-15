@@ -137,6 +137,8 @@ arm64/arm64/gic_v3_acpi.c	optional	acpi
 arm64/arm64/gic_v3_fdt.c	optional	fdt
 arm64/arm64/identcpu.c		standard
 arm64/arm64/in_cksum.c		optional	inet | inet6
+arm64/arm64/kasan_machdep.c	optional	kasan	\
+	compile-with "${CC} -c ${CFLAGS:N-fsanitize=kernel-address} ${WERROR} ${PROF} ${.IMPSRC}"
 arm64/arm64/locore.S		standard	no-obj
 arm64/arm64/machdep.c		standard
 arm64/arm64/mem.c		standard
@@ -146,7 +148,8 @@ arm64/arm64/minidump_machdep.c	standard
 arm64/arm64/mp_machdep.c	optional	smp
 arm64/arm64/nexus.c		standard
 arm64/arm64/ofw_machdep.c	optional	fdt
-arm64/arm64/pmap.c		standard
+arm64/arm64/pmap.c		standard	\
+	compile-with "${CC} -c ${CFLAGS:N-fsanitize=kernel-address} ${WERROR} ${PROF} ${.IMPSRC}"
 arm64/arm64/stack_machdep.c	optional	ddb | stack
 arm64/arm64/support.S		standard
 arm64/arm64/swtch.S		standard
@@ -260,7 +263,8 @@ kern/subr_devmap.c		standard
 kern/subr_intr.c		optional	intrng
 libkern/bcmp.c			standard
 libkern/memcmp.c		standard
-libkern/memset.c		standard
+libkern/memset.c		standard	\
+	compile-with "${CC} -c ${CFLAGS:N-fsanitize=kernel-address} ${WERROR} ${PROF} ${.IMPSRC}"
 libkern/arm64/crc32c_armv8.S	standard
 cddl/contrib/opensolaris/common/atomic/aarch64/opensolaris_atomic.S	optional zfs | dtrace compile-with "${CDDL_C}"
 cddl/dev/dtrace/aarch64/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"

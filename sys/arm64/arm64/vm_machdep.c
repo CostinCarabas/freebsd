@@ -26,12 +26,14 @@
  */
 
 #include "opt_platform.h"
+#include "opt_sanitizer.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kasan.h>
 #include <sys/limits.h>
 #include <sys/proc.h>
 #include <sys/sf_buf.h>
@@ -56,6 +58,12 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <dev/psci/psci.h>
+
+/*
+ * This seems to be needed for qemu. Without it we trigger an
+ * assertion in virtio.
+ */
+#define	KASAN_FULL_STACK
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -113,6 +121,12 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
 	td2->td_md.md_saved_daif = td1->td_md.md_saved_daif & ~DAIF_I_MASKED;
+
+#ifdef KASAN
+#ifndef KASAN_FULL_STACK
+	kasan_unpoison(td2->td_kstack, td2->td_pcb->pcb_sp - td2->td_kstack);
+#endif
+#endif
 }
 
 void
@@ -244,11 +258,28 @@ cpu_thread_alloc(struct thread *td)
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
 	    (struct trapframe *)td->td_pcb - 1);
+#ifdef KASAN
+#ifdef KASAN_FULL_STACK
+	kasan_unpoison(td->td_kstack, td->td_kstack_pages * PAGE_SIZE);
+#else
+	kasan_unpoison((vm_offset_t)td->td_pcb, sizeof(*td->td_pcb));
+	kasan_unpoison((vm_offset_t)td->td_frame, sizeof(*td->td_frame));
+#endif
+#endif
 }
 
 void
 cpu_thread_free(struct thread *td)
 {
+
+#ifdef KASAN
+#ifdef KASAN_FULL_STACK
+	kasan_poison(td->td_kstack, td->td_kstack_pages * PAGE_SIZE);
+#else
+	kasan_poison((vm_offset_t)td->td_pcb, sizeof(*td->td_pcb));
+	kasan_poison((vm_offset_t)td->td_frame, sizeof(*td->td_frame));
+#endif
+#endif
 }
 
 void

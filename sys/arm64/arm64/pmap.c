@@ -105,12 +105,14 @@ __FBSDID("$FreeBSD$");
  *	and to when physical maps must be made correct.
  */
 
+#include "opt_sanitizer.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
+#include <sys/kasan.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -1746,6 +1748,10 @@ pmap_growkernel(vm_offset_t addr)
 	addr = roundup2(addr, L2_SIZE);
 	if (addr - 1 >= vm_map_max(kernel_map))
 		addr = vm_map_max(kernel_map);
+#ifdef KASAN
+	if (kernel_vm_end < addr)
+		kasan_shadow_map(kernel_vm_end, addr - kernel_vm_end);
+#endif
 	while (kernel_vm_end < addr) {
 		l0 = pmap_l0(kernel_pmap, kernel_vm_end);
 		KASSERT(pmap_load(l0) != 0,
@@ -4630,6 +4636,9 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 	pd_entry_t *pde;
 	pt_entry_t *l2;
 	int i, lvl, l2_blocks, free_l2_count, start_idx;
+#ifdef KASAN
+	vm_size_t origsize = size;
+#endif
 
 	if (!vm_initialized) {
 		/*
@@ -4726,6 +4735,18 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 		pmap_kenter(va, size, pa, CACHED_MEMORY);
 	}
 
+#ifdef KASAN
+{
+	vm_offset_t addr;
+
+	addr = va + offset;
+	origsize += addr & KASAN_SHADOW_MASK;
+	addr -= addr & KASAN_SHADOW_MASK;
+
+	kasan_unpoison(va + offset, origsize);
+}
+#endif
+
 	return ((void *)(va + offset));
 }
 
@@ -4738,6 +4759,10 @@ pmap_unmapbios(vm_offset_t va, vm_size_t size)
 	pt_entry_t *l2;
 	int i, lvl, l2_blocks, block;
 	bool preinit_map;
+
+#ifdef KASAN
+	kasan_poison(va & ~KASAN_SHADOW_MASK, size + (va & KASAN_SHADOW_MASK));
+#endif
 
 	l2_blocks =
 	   (roundup2(va + size, L2_SIZE) - rounddown2(va, L2_SIZE)) >> L2_SHIFT;

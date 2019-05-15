@@ -124,6 +124,9 @@
  *
  * Upper region:    0xffffffffffffffff  Top of virtual memory
  *
+ *                  0xffffffefffffffff	End of KASAN shadow memory
+ *                  0xffffffe000000000	Start of KASAN shadow memory
+ *
  *                  0xfffffeffffffffff  End of DMAP
  *                  0xfffffd0000000000  Start of DMAP
  *
@@ -155,6 +158,9 @@
 /* 512 GiB of kernel addresses */
 #define	VM_MIN_KERNEL_ADDRESS	(0xffff000000000000UL)
 #define	VM_MAX_KERNEL_ADDRESS	(0xffff008000000000UL)
+
+#define	KASAN_MIN_ADDRESS	(0xffffffe000000000UL)
+#define	KASAN_MAX_ADDRESS	(0xfffffff000000000UL)
 
 /* 2 TiB maximum for the direct map region */
 #define	DMAP_MIN_ADDRESS	(0xfffffd0000000000UL)
