@@ -109,12 +109,14 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 #include "opt_pmap.h"
+#include "opt_sanitizer.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
+#include <sys/kasan.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -3730,6 +3732,10 @@ pmap_growkernel(vm_offset_t addr)
 	addr = roundup2(addr, NBPDR);
 	if (addr - 1 >= vm_map_max(kernel_map))
 		addr = vm_map_max(kernel_map);
+#ifdef KASAN
+       if (kernel_vm_end < addr)
+               kasan_shadow_map(kernel_vm_end, addr - kernel_vm_end);
+#endif
 	while (kernel_vm_end < addr) {
 		pdpe = pmap_pdpe(kernel_pmap, kernel_vm_end);
 		if ((*pdpe & X86_PG_V) == 0) {
@@ -7651,6 +7657,10 @@ pmap_mapdev_internal(vm_paddr_t pa, vm_size_t size, int mode, bool noflush)
 	vm_size_t tmpsize;
 	int i;
 
+#ifdef KASAN
+       vm_size_t origsize = size;
+#endif
+
 	offset = pa & PAGE_MASK;
 	size = round_page(offset + size);
 	pa = trunc_page(pa);
@@ -7702,6 +7712,19 @@ pmap_mapdev_internal(vm_paddr_t pa, vm_size_t size, int mode, bool noflush)
 	pmap_invalidate_range(kernel_pmap, va, va + tmpsize);
 	if (!noflush)
 		pmap_invalidate_cache_range(va, va + tmpsize);
+
+#ifdef KASAN
+{
+       vm_offset_t addr;
+
+       addr = va + offset;
+       origsize += addr & KASAN_SHADOW_MASK;
+       addr -= addr & KASAN_SHADOW_MASK;
+
+       kasan_unpoison(va + offset, origsize);
+}
+#endif
+
 	return ((void *)(va + offset));
 }
 
@@ -7739,6 +7762,10 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 	struct pmap_preinit_mapping *ppim;
 	vm_offset_t offset;
 	int i;
+
+#ifdef KASAN
+       kasan_poison(va & ~KASAN_SHADOW_MASK, size + (va & KASAN_SHADOW_MASK));
+#endif
 
 	/* If we gave a direct map region in pmap_mapdev, do nothing */
 	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS)

@@ -47,11 +47,13 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_isa.h"
 #include "opt_cpu.h"
+#include "opt_sanitizer.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/kasan.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -272,6 +274,12 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * will set up a stack to call fork_return(p, frame); to complete
 	 * the return to user-mode.
 	 */
+
+#ifdef KASAN
+#ifndef KASAN_FULL_STACK
+       kasan_unpoison(td2->td_kstack, td2->td_pcb->pcb_sp - td2->td_kstack);
+#endif
+#endif
 }
 
 /*
@@ -363,12 +371,29 @@ cpu_thread_alloc(struct thread *td)
 		bzero(xhdr, sizeof(*xhdr));
 		xhdr->xstate_bv = xsave_mask;
 	}
+
+#ifdef KASAN
+#ifdef KASAN_FULL_STACK
+       kasan_unpoison(td->td_kstack, td->td_kstack_pages * PAGE_SIZE);
+#else
+       kasan_unpoison((vm_offset_t)td->td_pcb, sizeof(*td->td_pcb));
+       kasan_unpoison((vm_offset_t)td->td_frame, sizeof(*td->td_frame));
+#endif
+#endif
 }
 
 void
 cpu_thread_free(struct thread *td)
 {
 
+#ifdef KASAN
+#ifdef KASAN_FULL_STACK
+       kasan_poison(td->td_kstack, td->td_kstack_pages * PAGE_SIZE);
+#else
+       kasan_poison((vm_offset_t)td->td_pcb, sizeof(*td->td_pcb));
+       kasan_poison((vm_offset_t)td->td_frame, sizeof(*td->td_frame));
+#endif
+#endif
 	cpu_thread_clean(td);
 }
 
