@@ -337,6 +337,15 @@ void	*memcpy_early(void * _Nonnull to, const void * _Nonnull from, size_t len);
 void	*memmove_early(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #define bcopy_early(from, to, len) memmove_early((to), (from), (len))
 
+#if defined(_KERNEL) && defined(KASAN)
+int kasan_kcopy(const void *, void *, size_t);
+
+int kasan_copystr(const void *, void *, size_t, size_t *);
+int kasan_copyinstr(const void *, void *, size_t, size_t *);
+int kasan_copyoutstr(const void *, void *, size_t, size_t *);
+int kasan_copyin(const void *, void *, size_t);
+#endif
+
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);

@@ -236,6 +236,7 @@ ZSTDIO		opt_zstdio.h
 COVERAGE	opt_global.h
 KCOV
 KUBSAN		opt_global.h
+KASAN		opt_kasan.h
 
 # POSIX kernel options
 P1003_1B_MQUEUE			opt_posix.h

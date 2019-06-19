@@ -38,6 +38,10 @@
 #ifndef	_SYS_CDEFS_H_
 #define	_SYS_CDEFS_H_
 
+#ifdef HAVE_KERNEL_OPTION_HEADERS
+#include "opt_kasan.h"
+#endif
+
 /*
  * Testing against Clang-specific extensions.
  */

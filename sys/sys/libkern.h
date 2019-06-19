@@ -41,6 +41,10 @@
 #include <sys/systm.h>
 #endif
 
+#ifdef HAVE_KERNEL_OPTION_HEADERS
+#include "opt_kasan.h"
+#endif
+
 #ifndef	LIBKERN_INLINE
 #define	LIBKERN_INLINE  static __inline
 #define	LIBKERN_BODY
@@ -160,6 +164,20 @@ int	 locc(int, char *, u_int);
 void	*memchr(const void *s, int c, size_t n);
 void	*memcchr(const void *s, int c, size_t n);
 void	*memmem(const void *l, size_t l_len, const void *s, size_t s_len);
+
+#if defined(_KERNEL) && defined(KASAN)
+void    *kasan_memset(void *, int, size_t);
+int  kasan_memcmp(const void *, const void *, size_t);
+void    *kasan_memcpy(void *, const void *, size_t);
+#define memcpy(d, s, l)     kasan_memcpy(d, s, l)
+#define memcmp(a, b, l)     kasan_memcmp(a, b, l)
+#define memset(d, v, l)     kasan_memset(d, v, l)
+#else
+#define memcpy(d, s, l)     __builtin_memcpy(d, s, l)
+#define memcmp(a, b, l)     __builtin_memcmp(a, b, l)
+#define memset(d, v, l)     __builtin_memset(d, v, l)
+#endif /* _KERNEL && KASAN */
+
 void	 qsort(void *base, size_t nmemb, size_t size,
 	    int (*compar)(const void *, const void *));
 void	 qsort_r(void *base, size_t nmemb, size_t size, void *thunk,
@@ -189,6 +207,19 @@ char	*strsep(char **, const char *delim);
 size_t	 strspn(const char *, const char *);
 char	*strstr(const char *, const char *);
 int	 strvalid(const char *, size_t);
+
+#if defined(_KERNEL) && defined(KASAN)
+char    *kasan_strcpy(char *, const char *);
+int  kasan_strcmp(const char *, const char *);
+size_t   kasan_strlen(const char *);
+#define strcpy(d, s)        kasan_strcpy(d, s)
+#define strcmp(a, b)        kasan_strcmp(a, b)
+#define strlen(a)       kasan_strlen(a)
+#else
+#define strcpy(d, s)        __builtin_strcpy(d, s)
+#define strcmp(a, b)        __builtin_strcmp(a, b)
+#define strlen(a)       __builtin_strlen(a)
+#endif /* _KERNEL && KASAN */
 
 static __inline char *
 index(const char *p, int ch)
